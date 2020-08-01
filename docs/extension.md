@@ -1,26 +1,23 @@
 # 扩展
 
-gdb支持用户自定义扩展来增强gdb的调试能力。目前支持使用Python或者Guile（Scheme语言的一种实现）来进行扩展。这里单讲如何编写Python扩展部分。
+gdb允许用户通过Python或Guile（Scheme）扩展来增强gdb的调试能力，其中仅Python扩展是gdb默认启用的，所以这里单讲如何使用Python编写gdb扩展。
 
-我们将通过一个实际的例子来讲述Python扩展的一些基本概念，并最终通过gdb提供的官方Python API来编写一个实用命令。
+gcc 7.x以后，内置了一个新的功能——[Pretty-Printer](https://sourceware.org/gdb/current/onlinedocs/gdb/Pretty_002dPrinter-Introduction.html#Pretty_002dPrinter-Introduction)，该功能可以非常『漂亮』的打印数组、结构体和class的内容，尤其是对C++容器的支持。和`print`命令无缝结合，让调试更加的简单。遗憾的是该功能比较单一，只是美化了输出，对于较大数据量会进行截断，并隐藏了内存地址和其他一些重要的调试信息。
 
-## 扩展命令
-gdb有一个很强大的`examine`命令——`x`。`x`命令是专门用来查看指针所指一片连续的内存内容的，但无法应用到C++容器中。我们仿照`x`来实现一个新的gdb命令`View`——`v`。该命令通过Python扩展实现主要功能有：
+鉴于此，本文将通过编写一个实用的gdb扩展来支持在gdb中对C++容器常用调试操作，可以作为`Pretty-Printer`的增强。
 
-*  获取C++容器的各种内部信息，包括内容、首地址、长度等信息；
-*  支持查找、下标访问等行为。
-
-要获取容器信息，必须要了解gcc中各种容器的源码实现。此外，我们通过`x`或者`p`命令也可以获取容器的各种信息，但也是要事先了解容器的源码实现。
+编写针对于C++容器的Python扩展需要两方面知识：一是足够了解C++容器的源码实现；二是熟悉gdb提供的Python API。因此我们从C++容器开始一一讲解。
 
 ## C++容器
 这里介绍如下三种常用容器的源码实现：
+
 1. `std::string`
 2. `std::vector`
 3. `std::unordered_map`
 
-讲解的源码版本为gcc 8.3.0，源码地址：http://mirror.hust.edu.cn/gnu/gcc/gcc-8.3.0/
+这里采用的源码版本为gcc 8.3.0，源码地址：http://mirror.hust.edu.cn/gnu/gcc/gcc-8.3.0/
 
-*gcc在版本4.x以后，容器的内存布局甚至是成员变量名均少有变化，因此该部分介绍的内容可以适用于目前绝大多数的gcc版本。在不同版本或者ABI下有较大差异的实现下文也会单独注明*
+**注意**：gcc在版本4.x以后，容器的内存布局甚至是成员变量名均少有变化，因此该部分介绍的内容可以适用于目前绝大多数的gcc版本。在不同版本或者ABI下有较大差异的实现下文也会单独注明
 
 ### std::string
 
@@ -38,27 +35,29 @@ gdb有一个很强大的`examine`命令——`x`。`x`命令是专门用来查�
 
 ### std::vector
 
-`std::vector`的实现和`std::string`基本一致，包括内部动态内存的扩展机制。这里不多介绍，内存布局如下：
+`std::vector`的实现和`std::string`基本一致，这里不多介绍，内存布局如下：
 
 ![vector](https://raw.githubusercontent.com/Zacharier/gdb-debug/master/assets/img/vector.png)
 
 ### std::unordered_map
 
-`std::unordered_map`即哈希表。内部由一个桶数组和链表实现，即经典的链式哈希表。内存布局如下
+`std::unordered_map`即哈希表，内部由一个桶数组和链表实现，即经典的链式哈希表。内存布局如下
 
-注意：这个实现版本将有元素的桶与桶通过`node`节点的`next`指针相连，由`before_begin`指针记录首地址。这样的好处是便于高效迭代。迭代时，像迭代单链表的方式一样，从`before_begin`出发，可以在O(n)时间内迭代完哈希表内的所有元素。（其中n为哈希表中元素的数量，即`element_count`或`std::unordered_map::size()`）
+**注意**：该实现版本将所有元素通过`next`指针首尾相连，便于高效迭代。迭代方式和普通单链表一样，从`before_begin`出发，在`O(n)`时间可以内完成迭代操作。（其中n为哈希表中元素的数量，即`element_count`或`std::unordered_map::size()`）
 
 ![unordered_map (3)](https://raw.githubusercontent.com/Zacharier/gdb-debug/master/assets/img/unordered_map.png)
 
-## Python扩展
+## Python API
 
-### Python API
+gdb会将调试时的各种信息根据源码抽象成统一的Python对象，我们可以根据源码结构通过gdb提供的Python API对该对象进行各种操作，如：变量/成员访问、解指针/引用、地址偏移、数组/链表遍历、寄存器状态、栈回溯等各种功能。因此要编写扩展，必须先了解Python API。
 
-这里根据gdb的Python API做一个简要的基本介绍。更详细的内容可参考：https://sourceware.org/gdb/current/onlinedocs/gdb/Python-API.html#Python-API 
+这里对Python API做一个简要的基本介绍。更详细的内容可参考官方文档：https://sourceware.org/gdb/current/onlinedocs/gdb/Python-API.html#Python-API 
 
-#### Symbol
+### Symbol
 
-`gdb.Symbol`代表调试时候的源码中的各种符号，如变量名，函数名，类名等等。这些信息都存储在符号表中并且在运行时不可变（虽然C++函数名会在编译时被`mangled`）。
+`gdb.Symbol`代表调试时源码中的各种符号，如变量名，函数名，类名等等。这些信息都存储在符号表中并且在运行时不可变（虽然C++函数名会在编译时被`mangled`）。
+
+示例：
 
 ```C++
 int main() {
@@ -82,16 +81,18 @@ True
 'a'
 ```
 
-#### Value
+### Value
 
 `gdb.Value`代表gdb调试时候的一个`value`。可以是变量（包括全局/静态变量）、指针、引用、表达式、字面量或者函数。`value`可以支持基本的加减乘除运算，其结果仍然是一个`value`对象，或者一些二元操作。
+
+示例：
 
 ```C++
 void test() {
     puts("test\n");
 }
 ```
-`pi`模式下：
+`pi`模式：
 
 ```
 (gdb) pi
@@ -103,26 +104,30 @@ test
 <gdb.Value object at 0xb5aacec0>
 ```
 
-#### Type
+### Type
 
 `gdb.Type`代表gdb调试时候的对象类型。可以是基本类型，也可以是各种符合类型，以及stl的模板类型。
+
+示例：
 
 ```C++
 std::string s("Hello, World");
 ```
 
-`pi`模式下：
+`pi`模式：
 
 ```
+(gdb) pi
 >>> sym, _ = gdb.lookup_symbol('s')
 >>> sym.type.name
 'std::__cxx11::string'
 ```
 
-#### Command
+### Command
 `gdb.Command`用来实现一个新gdb命令，支持在gdb中直接调用，和gdb内置命令的并无区别。
 一个简单的来自官方的例子：
 hello_world.py：
+
 ```Python
 class HelloWorld (gdb.Command):
   """Greet the whole world."""
@@ -142,13 +147,27 @@ HelloWorld ()
 Hello, World!
 ```
 
-Python API的基本的概念就介绍到此，这已经足够我们写一个使用的扩展工具了。
+Python API的基本的概念就介绍到此，这足够我们写一个gdb扩展了。
 
-### View扩展
+## Python扩展
 
-gdb扩展`v`命令代码：[view.py](https://github.com/Zacharier/gdb-debug/blob/master/codes/view.py "view.py")
+gdb有一个`examine`命令——`x`。`x`命令专门用来查看指针所指向的内容，非常强大，可惜却无法应用到C++容器中。我们仿照`x`来实现一个新的gdb命令`View`——`v`。该命令通过Python扩展实现主要功能有：
 
-#### 加载
+*  获取C++容器的各种内部信息，包括内容、首地址、长度等信息
+*  支持查找、下标访问等行为
+
+### 代码
+
+gdb扩展`v`命令Python代码实现见 [view.py](https://github.com/Zacharier/gdb-debug/blob/master/codes/view.py "view.py")。实现涉及到的基本概念上文均有讲解，这里不再赘述。
+
+该扩展支持如下功能：
+
+1. 打印容器的内容
+2. 打印容器的大小
+3. 通过下标访问容器元素
+4. 通过key访问关联容器的value
+
+### 加载
 
 1. 直接在gdb中使用`source`命令加载扩展脚本，如：`source view.py`
 
@@ -172,8 +191,6 @@ gdb扩展`v`命令代码：[view.py](https://github.com/Zacharier/gdb-debug/blob
             /i    return the item at index of string/vector.
             /f    find the corresponding value by KEY.
 ```
-
-
 
 #### 使用
 
@@ -224,4 +241,3 @@ int main(int argc, char* argv[]) {
 (gdb) v /f map 5
 6
 ```
-
