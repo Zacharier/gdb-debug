@@ -15,7 +15,7 @@ gcc 7.x以后，内置了一个新的功能——[Pretty-Printer](https://source
 2. `std::vector`
 3. `std::unordered_map`
 
-这里采用的源码版本为gcc 8.3.0，源码地址：http://mirror.hust.edu.cn/gnu/gcc/gcc-8.3.0/
+这里采用的源码版本为 [gcc 8.3.0](http://mirror.hust.edu.cn/gnu/gcc/gcc-8.3.0/)
 
 **注意**：gcc在版本4.x以后，容器的内存布局甚至是成员变量名均少有变化，因此该部分介绍的内容可以适用于目前绝大多数的gcc版本。在不同版本或者ABI下有较大差异的实现下文也会单独注明
 
@@ -51,7 +51,7 @@ gcc 7.x以后，内置了一个新的功能——[Pretty-Printer](https://source
 
 gdb会将调试时的各种信息根据源码抽象成统一的Python对象，我们可以根据源码结构通过gdb提供的Python API对该对象进行各种操作，如：变量/成员访问、解指针/引用、地址偏移、数组/链表遍历、寄存器状态、栈回溯等各种功能。因此要编写扩展，必须先了解Python API。
 
-这里对Python API做一个简要的基本介绍。更详细的内容可参考官方文档：https://sourceware.org/gdb/current/onlinedocs/gdb/Python-API.html#Python-API 
+这里对Python API做一个简要的基本介绍。更详细的内容可参考[官方文档](https://sourceware.org/gdb/current/onlinedocs/gdb/Python-API.html#Python-API)
 
 ### Symbol
 
@@ -158,7 +158,7 @@ gdb有一个`examine`命令——`x`。`x`命令专门用来查看指针所指�
 
 ### 代码
 
-gdb扩展`v`命令Python代码实现见 [view.py](https://github.com/Zacharier/gdb-debug/blob/master/codes/view.py "view.py")。实现涉及到的基本概念上文均有讲解，这里不再赘述。
+gdb扩展`v`命令Python代码实现见 [view.py](https://github.com/Zacharier/gdb-debug/blob/master/python/view.py "view.py")。实现涉及到的基本概念上文均有讲解，这里不再赘述。
 
 该扩展支持如下功能：
 
