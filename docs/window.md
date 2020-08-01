@@ -55,7 +55,7 @@ gdb在TUI模式最主要的几个快捷键：
 
 `C-x 1`效果如下：
 
-![image-20200717173430320](https://raw.githubusercontent.com/Zacharier/gdb-debug/master/assets/img/image-20200717173430320.png)
+![image-20200717173430320](/assets/img/image-20200717173430320.png)
 
 *注：这也是通过命令`gdb -tui demo`启动时的默认显示窗口。*
 
@@ -63,13 +63,13 @@ gdb在TUI模式最主要的几个快捷键：
 
 `C-x 2`效果如下：
 
-![image-20200717173710011](https://raw.githubusercontent.com/Zacharier/gdb-debug/master/assets/img/image-20200717173710011.png)
+![image-20200717173710011](/assets/img/image-20200717173710011.png)
 
 窗口被一分为三，由上到下依次是：源码窗口、汇编窗口和命令行窗口。
 
 重复按`C-x 2`可以看到更多的窗口组合，如：
 
-![image-20200717174123695](https://raw.githubusercontent.com/Zacharier/gdb-debug/master/assets/img/image-20200717174123695.png)
+![image-20200717174123695](/master/assets/img/image-20200717174123695.png)
 
 由上到下分别变成：寄存器窗口、源码窗口和命令行窗口。
 
@@ -83,7 +83,7 @@ gdb在TUI模式最主要的几个快捷键：
 
 使用Emacs编辑源码时，执行`M-x gdb`可以打开gdb命令行窗口，支持在Emacs中进行gdb调试，调试方式和gdb中命令行模式一样。另外，Emacs支持一种更为强大的多窗口调试，通过执行`M-x gdb-many-windows`可以看到如下效果：
 
-![image-20200718011223849](https://raw.githubusercontent.com/Zacharier/gdb-debug/master/assets/img/image-20200718011223849.png)
+![image-20200718011223849](/assets/img/image-20200718011223849.png)
 
 上图的布局解释如下：
 
