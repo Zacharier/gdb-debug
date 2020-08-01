@@ -27,17 +27,17 @@ gcc 7.x以后，内置了一个新的功能——[Pretty-Printer](https://source
 
 在gcc4.x以后string的实现基于引用计数的COW（Copy On Write），内存布局如下：
 
-![string_cow](https://raw.githubusercontent.com/Zacharier/gdb-debug/master/assets/img/string_cow.png)
+![string_cow](/assets/img/string_cow.png)
 
 在gcc7.x以上，默认启用C++11 ABI宏的本地Buff实现，内存布局如下：
 
-![string_buf](https://raw.githubusercontent.com/Zacharier/gdb-debug/master/assets/img/string_buf.png)
+![string_buf](/assets/img/string_buf.png)
 
 ### std::vector
 
 `std::vector`的实现和`std::string`基本一致，这里不多介绍，内存布局如下：
 
-![vector](https://raw.githubusercontent.com/Zacharier/gdb-debug/master/assets/img/vector.png)
+![vector](/assets/img/vector.png)
 
 ### std::unordered_map
 
@@ -45,7 +45,7 @@ gcc 7.x以后，内置了一个新的功能——[Pretty-Printer](https://source
 
 **注意**：该实现版本将所有元素通过`next`指针首尾相连，便于高效迭代。迭代方式和普通单链表一样，从`before_begin`出发，在`O(n)`时间可以内完成迭代操作。（其中n为哈希表中元素的数量，即`element_count`或`std::unordered_map::size()`）
 
-![unordered_map (3)](https://raw.githubusercontent.com/Zacharier/gdb-debug/master/assets/img/unordered_map.png)
+![unordered_map (3)](/assets/img/unordered_map.png)
 
 ## Python API
 
