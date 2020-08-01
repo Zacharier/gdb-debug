@@ -1,4 +1,3 @@
-import functools
 import gdb
 
 
@@ -19,13 +18,13 @@ class View(object):
     def __init__(self, name=None):
         self.name = name
 
-    def at(self, val, _):
+    def at(self, val, idx):
         raise UnimplementedError('/i')
 
-    def length(self, val, _):
+    def size(self, val):
         raise UnimplementedError('/l')
 
-    def find(self, _):
+    def find(self, val, key):
         raise UnimplementedError('/f')
 
     def to_string(self, val):
@@ -56,33 +55,31 @@ class StdStringView(View):
     def at(self, val, i):
         i = int(i)
         ptr = val['_M_dataplus']['_M_p']
-        if i >= self.length(val):
+        if i >= self.size(val):
             raise OutBoundError(i)
         return (ptr + i).dereference()
 
-    def length(self, val):
+    def size(self, val):
         ptr = val['_M_dataplus']['_M_p']
         head = ptr.cast(gdb.lookup_type('size_t').pointer()) - 3;
         # capacity = (head + 1).dereference()
         # refcount = (head + 2).dereference()
-        # return ptr, length, capacity, refcount
-        length = head.dereference()
-        return int(length)
+        # return ptr, size, capacity, refcount
+        size = head.dereference()
+        return int(size)
 
     def to_string(self, val):
         ptr = val['_M_dataplus']['_M_p']
-        length = self.length(val)
-        iterator = ContiguousIterator(ptr, ptr + self.length(val))
-        content = ''.join(map(chr,iterator))
-        ptr = ptr.cast(gdb.lookup_type('void').pointer())
-        return '<address: %s, content: {%s}>' % (ptr, repr(content))
+        iterator = ContiguousIterator(ptr, ptr + self.size(val))
+        void_ptr = ptr.cast(gdb.lookup_type('void').pointer())
+        return '<address: %s, content: {%s}>' % (void_ptr, bytes(iterator))
 
 
 class StdCxx11StringView(StdStringView):
     def __init__(self):
         super().__init__('std::__cxx11::string')
 
-    def length(self, val):
+    def size(self, val):
         return int(val['_M_string_length'])
 
 
@@ -93,11 +90,11 @@ class StdVectorView(View):
     def at(self, val, i):
         i = int(i)
         ptr = val['_M_impl']['_M_start']
-        if i >= self.length(val):
+        if i >= self.size(val):
             raise OutBoundError(i)
         return (ptr + i).dereference()
 
-    def length(self, val):
+    def size(self, val):
         start = val['_M_impl']['_M_start']
         finish = val['_M_impl']['_M_finish']
         return int(finish - start)
@@ -147,7 +144,7 @@ class StdUnorderedMapView(View):
                 return second
         raise NotFoundError(key)
 
-    def length(self, val):
+    def size(self, val):
         return int(val['_M_h']['_M_element_count'])
 
     def to_string(self, val):
@@ -157,9 +154,9 @@ class StdUnorderedMapView(View):
 
 class Viewer(gdb.Command):
     """\
-    Usage: v [OPTION]... SYMBOL...
+    Usage: v [OPTION]... OBJECT...
     Options:
-            /l    calculate length/size of object.
+            /l    get the length or size of object.
             /i    return the item at index of string/vector.
             /f    find the corresponding value by KEY.
     """
@@ -198,7 +195,7 @@ class Viewer(gdb.Command):
             type_name = type_name[:idx]
         view = self.registry.get(type_name, View)
         mapping = {
-            '/l': view.length,
+            '/l': view.size,
             '/i': view.at,
             '/f': view.find
         }
@@ -214,7 +211,7 @@ class Viewer(gdb.Command):
             print("Symbol Error: %s" % e)
         except OutBoundError as e:
             print("Out Bound Error: %s" % e)
-        except UnimplementedError:
+        except UnimplementedError as e:
             print("Unimpelemeted Error: %s'" % e)
         except NotFoundError as e:
             print("Not Found Error: %s" % e)
